@@ -3,6 +3,11 @@
   "builds": [
     { "src": "server.js", "use": "@vercel/node" }
   ],
+  "functions": {
+    "server.js": {
+      "includeFiles": ["index.html", "style.css", "app.js"]
+    }
+  },
   "rewrites": [
     { "source": "/api/:path*", "destination": "/server.js" },
     { "source": "/taoma", "destination": "/server.js" },

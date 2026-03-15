@@ -1,5 +1,6 @@
 require("dotenv").config();
 
+const fs = require("fs");
 const path = require("path");
 const express = require("express");
 const session = require("express-session");
@@ -32,7 +33,9 @@ app.use(
 );
 
 // Serve static frontend files (index.html, app.js, style.css, imgs, ...)
-app.use(express.static(path.join(__dirname)));
+// Trên Vercel dùng process.cwd() để tìm file (__dirname có thể chỉ trỏ vào bundle)
+const staticDirs = [process.cwd(), __dirname].filter(Boolean);
+staticDirs.forEach((dir) => app.use(express.static(path.join(dir))));
 
 // Trên Vercel: trả 503 nếu chưa cấu hình MONGODB_URI (tránh crash)
 app.use("/api", (req, res, next) => {
@@ -350,9 +353,12 @@ app.post("/api/history", async (req, res) => {
   }
 });
 
-// Trang chính vòng quay
+// Trang chính vòng quay (thử cwd trước để tương thích Vercel)
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
+  const idxCwd = path.join(process.cwd(), "index.html");
+  const idxDir = path.join(__dirname, "index.html");
+  if (fs.existsSync(idxCwd)) return res.sendFile(idxCwd);
+  res.sendFile(idxDir);
 });
 
 // ======================== TRANG ADMIN /taoma (tạo mã, thẻ cào, user) ========================
