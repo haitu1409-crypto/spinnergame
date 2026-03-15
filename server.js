@@ -3,6 +3,7 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
+const compression = require("compression");
 const session = require("express-session");
 
 const mongoose = require("mongoose");
@@ -19,6 +20,7 @@ connectDB();
 
 const app = express();
 
+app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -39,7 +41,7 @@ const publicDirs = [
   process.cwd(),
 ];
 const publicDir = publicDirs.find((d) => fs.existsSync(path.join(d, "index.html"))) || path.join(__dirname, "public");
-app.use(express.static(publicDir));
+app.use(express.static(publicDir, { maxAge: process.env.VERCEL ? "1d" : 0 }));
 
 // Đợi kết nối DB trước khi xử lý API (trả lỗi thật nếu kết nối thất bại)
 app.use("/api", async (req, res, next) => {
@@ -80,7 +82,7 @@ app.post("/api/get-or-create-user", async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ username }).lean();
     if (!user) {
       console.log("get-or-create-user: tài khoản chưa có trong DB:", username);
       return res.status(400).json({
@@ -119,7 +121,7 @@ app.post("/api/verify-code", async (req, res) => {
     code = code.trim().toUpperCase();
 
     // Đảm bảo user tồn tại
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ username }).lean();
     if (!user) {
       return res
         .status(400)
@@ -275,7 +277,7 @@ app.post("/api/record-bonus-win", async (req, res) => {
       return res.status(400).json({ success: false, message: "Giải thưởng không hợp lệ" });
     }
 
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ username }).lean();
     if (!user) {
       return res.status(400).json({ success: false, message: "Tài khoản không tồn tại" });
     }
@@ -547,7 +549,7 @@ app.post("/api/add-user", async (req, res) => {
   const cleanUsername = username.trim().toLowerCase();
 
   try {
-    const existing = await User.findOne({ username: cleanUsername });
+    const existing = await User.findOne({ username: cleanUsername }).lean();
     if (existing) {
       return res.send(
         `User ${cleanUsername} đã tồn tại!<br><a href='/taoma'>Quay lại</a>`

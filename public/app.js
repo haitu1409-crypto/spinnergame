@@ -152,6 +152,8 @@ let pendingBonusSpins = 0;
 let currentCode = null;
 let lastWonPrize = null;
 let currentUsername = null;
+/** Cache ô giải thưởng để animation không phải query DOM mỗi frame */
+let prizeCells = [];
 
 // === SESSION (localStorage) ===
 
@@ -206,6 +208,15 @@ function setLoggedOut() {
 
 // === UTILITIES ===
 
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+function escapeAttr(str) {
+  return escapeHtml(str).replace(/"/g, "&quot;");
+}
+
 async function copyToClipboard(text) {
   try {
     if (navigator.clipboard?.writeText) {
@@ -232,6 +243,7 @@ function initGrid() {
   if (!els.grid) return;
 
   els.grid.innerHTML = "";
+  prizeCells = [];
 
   if (SHUFFLED_PRIZES.length !== 20) {
     els.result.textContent = "Lỗi: Cần đúng 20 phần thưởng trong PRIZES";
@@ -242,6 +254,7 @@ function initGrid() {
   els.result.textContent = "";
   els.result.classList.remove("error");
 
+  const fragment = document.createDocumentFragment();
   SHUFFLED_PRIZES.forEach((prize) => {
     const cell = document.createElement("div");
     cell.className = "prize-cell";
@@ -250,10 +263,14 @@ function initGrid() {
     img.className = "prize-icon";
     img.src = prize.image;
     img.alt = prize.label;
+    img.loading = "lazy";
+    img.decoding = "async";
 
     cell.appendChild(img);
-    els.grid.appendChild(cell);
+    fragment.appendChild(cell);
   });
+  els.grid.appendChild(fragment);
+  prizeCells = [...els.grid.querySelectorAll(".prize-cell")];
 }
 
 function pickPrizeIndex() {
@@ -271,47 +288,56 @@ function pickPrizeIndex() {
 }
 
 function clearHighlights() {
-  document.querySelectorAll(".prize-cell").forEach((el) => {
-    el.classList.remove("highlight", "final");
-  });
+  const cells = prizeCells.length ? prizeCells : els.grid ? [...els.grid.querySelectorAll(".prize-cell")] : [];
+  for (let i = 0; i < cells.length; i++) {
+    cells[i].classList.remove("highlight", "final");
+  }
 }
 
 function animateSpin(targetIndex) {
-  const cells = [...document.querySelectorAll(".prize-cell")];
+  const cells = prizeCells.length ? prizeCells : (els.grid ? [...els.grid.querySelectorAll(".prize-cell")] : []);
   if (!cells.length) return Promise.resolve();
 
   const rounds = 3 + Math.floor(Math.random() * 2);
   const totalSteps = rounds * cells.length + targetIndex;
-
   let step = 0;
   let idx = 0;
-  let delay = 110;
+  let delayMs = 110;
+  let lastTime = 0;
 
   clearHighlights();
 
   return new Promise((resolve) => {
-    function frame() {
+    function frame(now) {
+      if (lastTime === 0) lastTime = now;
+      const elapsed = now - lastTime;
+      if (elapsed < delayMs && step <= totalSteps) {
+        requestAnimationFrame(frame);
+        return;
+      }
+      lastTime = now;
+
       clearHighlights();
       cells[idx].classList.add("highlight");
 
       if (step < totalSteps * 0.3) {
-        delay = Math.max(70, delay - 4);
+        delayMs = Math.max(70, delayMs - 4);
       } else if (step > totalSteps * 0.7) {
-        delay = Math.min(220, delay + 10);
+        delayMs = Math.min(220, delayMs + 10);
       }
 
       step++;
       idx = (idx + 1) % cells.length;
 
       if (step <= totalSteps) {
-        setTimeout(frame, delay);
+        requestAnimationFrame(frame);
       } else {
         clearHighlights();
         cells[targetIndex].classList.add("final");
         resolve();
       }
     }
-    frame();
+    requestAnimationFrame(frame);
   });
 }
 
@@ -500,24 +526,21 @@ async function loadHistory(username) {
       els.historyList.innerHTML = filtered.map(item => {
         const bonusList = item.bonusCodesWithStatus || (item.bonusCodes || []).map(c => (typeof c === "string" ? { code: c, used: false } : c));
         const bonusHtml = bonusList.length
-          ? `<div class="history-bonus-codes">Mã quay tiếp: ${bonusList.map(({ code, used }) => `<span class="bonus-code ${used ? "used" : ""}"><code>${code}</code><button type="button" class="copy-btn-mini" data-copy="${code}">Copy</button><span class="code-status-badge">${used ? "Đã dùng" : "Chưa dùng"}</span></span>`).join(" ")}</div>`
+          ? `<div class="history-bonus-codes">Mã quay tiếp: ${bonusList.map(({ code, used }) => `<span class="bonus-code ${used ? "used" : ""}"><code>${escapeHtml(String(code))}</code><button type="button" class="copy-btn-mini" data-copy="${escapeAttr(String(code))}">Copy</button><span class="code-status-badge">${used ? "Đã dùng" : "Chưa dùng"}</span></span>`).join(" ")}</div>`
           : "";
-        const title = item.prizeLabel || (item.cardCode && item.serial ? "Thẻ cào" : "Phần thưởng");
+        const title = escapeHtml(item.prizeLabel || (item.cardCode && item.serial ? "Thẻ cào" : "Phần thưởng"));
         const isCardItem = (item.cardCode && item.serial) || item.prizeLabel?.startsWith("Thẻ cào");
         return `
         <div class="history-item ${isCardItem ? "history-item-card" : ""}">
           <div class="history-item-title">${title}</div>
           <div class="history-item-meta">${new Date(item.spunAt).toLocaleString()}</div>
           ${(item.isClaimed || (item.cardCode && item.serial)) ? `
-            <div class="history-card-info">Mã: <strong>${item.cardCode || "-"}</strong></div>
-            <div class="history-card-info">Seri: <strong>${item.serial || "-"}</strong></div>
+            <div class="history-card-info">Mã: <strong>${escapeHtml(String(item.cardCode || "-"))}</strong></div>
+            <div class="history-card-info">Seri: <strong>${escapeHtml(String(item.serial || "-"))}</strong></div>
           ` : ""}
           ${bonusHtml}
         </div>
       `}).join("");
-      els.historyList.querySelectorAll(".copy-btn-mini").forEach(btn => {
-        btn.addEventListener("click", () => copyToClipboard(btn.dataset.copy || ""));
-      });
     }
   } catch (e) {
     els.historyList.innerHTML = "<p class='history-placeholder'>Lỗi tải lịch sử</p>";
@@ -657,6 +680,12 @@ els.historyLogoutBtn?.addEventListener("click", () => {
 els.modalClose?.addEventListener("click", closePrizeModal);
 els.prizeModal?.addEventListener("click", (e) => {
   if (e.target === els.prizeModal) closePrizeModal();
+});
+
+// Event delegation: một listener cho tất cả nút Copy trong lịch sử (tránh gắn từng nút)
+els.historyList?.addEventListener("click", (e) => {
+  const btn = e.target.closest(".copy-btn-mini");
+  if (btn && btn.dataset.copy) copyToClipboard(btn.dataset.copy);
 });
 
 // === INIT ===
