@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "server.js", "use": "@vercel/node" }
+  ],
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/server.js" },
+    { "source": "/taoma", "destination": "/server.js" },
+    { "source": "/admin-login", "destination": "/server.js" }
+  ]
+}
