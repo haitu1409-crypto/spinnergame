@@ -4,6 +4,7 @@ const path = require("path");
 const express = require("express");
 const session = require("express-session");
 
+const mongoose = require("mongoose");
 const connectDB = require("./config/db");
 const User = require("./models/User");
 const SpinCode = require("./models/SpinCode");
@@ -33,9 +34,21 @@ app.use(
 // Serve static frontend files (index.html, app.js, style.css, imgs, ...)
 app.use(express.static(path.join(__dirname)));
 
+// Trên Vercel: trả 503 nếu chưa cấu hình MONGODB_URI (tránh crash)
+app.use("/api", (req, res, next) => {
+  if (req.path === "/health") return next();
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      success: false,
+      message: "Database chưa cấu hình. Vercel → Project Settings → Environment Variables → thêm MONGODB_URI.",
+    });
+  }
+  next();
+});
+
 // === API HEALTH CHECK ===
 app.get("/api/health", (req, res) => {
-  res.json({ ok: true });
+  res.json({ ok: true, db: mongoose.connection.readyState === 1 });
 });
 
 // === API: Kiểm tra user (chỉ cho phép tài khoản đã được admin thêm trong trang taoma) ===
