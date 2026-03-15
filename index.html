@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vòng quay quà tặng sự kiện</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>Sự kiện quay quà</h1>
+      <p>Nhấn nút quay để nhận quà may mắn!</p>
+      <div id="user-badge" class="user-badge hidden">
+        <span id="user-badge-name"></span>
+        <button id="user-logout-btn" type="button" class="logout-btn">Đăng xuất</button>
+      </div>
+    </header>
+
+    <!-- Thanh thông báo trúng thưởng (ảo) - chạy ngang -->
+    <div class="notify-taskbar">
+      <div class="notify-taskbar-title">🎉 Thông báo trúng thưởng</div>
+      <div class="notify-list-wrap">
+        <div id="notify-track" class="notify-track"></div>
+      </div>
+    </div>
+
+    <div class="page-layout">
+      <main class="main-content">
+        <section class="grid-section">
+          <div class="grid-wrapper">
+            <div id="prize-grid" class="grid"></div>
+            <div class="spin-button-center">
+              <button id="spin-button" class="spin-button spin-button-circle" type="button">Quay số</button>
+            </div>
+          </div>
+          <div id="code-status" class="code-status"></div>
+          <div id="result" class="result"></div>
+        </section>
+      </main>
+
+      <aside class="history-sidebar">
+        <div class="history-sidebar-inner">
+          <h3 class="history-sidebar-title">Lịch sử nhận thưởng</h3>
+          <div id="history-login" class="history-login">
+            <input id="history-username-input" type="text" placeholder="Nhập tên tài khoản 188lux" autocomplete="off" />
+            <button id="history-load-btn" type="button" class="spin-button small">Xem lịch sử</button>
+            <p id="history-error" class="error"></p>
+          </div>
+          <div id="history-logged" class="history-logged hidden">
+            <p class="history-user">Xin chào <strong id="history-username-display"></strong></p>
+            <button id="history-logout-btn" type="button" class="logout-btn small">Đăng xuất</button>
+          </div>
+          <div id="history-list" class="history-list"></div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Modal kết quả thưởng -->
+    <div id="prize-modal" class="modal-backdrop" aria-hidden="true">
+      <div class="modal">
+        <!-- <button class="modal-close" id="modal-close-btn" aria-label="Đóng">×</button> -->
+        <div class="modal-inner-glow"></div>
+        <div class="modal-content">
+          <p class="modal-label">Chúc mừng!</p>
+          <img id="modal-prize-image" class="modal-prize-image" src="" alt="" />
+          <h2 class="modal-title" id="modal-prize-label"></h2>
+          <p class="modal-description" id="modal-prize-description"></p>
+          <div id="claim-section" class="claim-section">
+            <button id="claim-button" class="spin-button small claim-button" type="button">
+              Nhận thưởng
+            </button>
+            <div id="claim-info" class="claim-info hidden">
+              <div class="claim-row">
+                <span class="claim-label">Mã thẻ:</span>
+                <span id="claim-code" class="claim-value"></span>
+                <button id="copy-code-button" class="copy-button" type="button">Copy</button>
+              </div>
+              <div class="claim-row">
+                <span class="claim-label">Số seri:</span>
+                <span id="claim-serial" class="claim-value"></span>
+                <button id="copy-serial-button" class="copy-button" type="button">Copy</button>
+              </div>
+              <p id="claim-message" class="claim-message"></p>
+            </div>
+          </div>
+        </div>
+        <div class="modal-effects">
+          <div class="burst burst-1"></div>
+          <div class="burst burst-2"></div>
+          <div class="burst burst-3"></div>
+          <div class="spark spark-1"></div>
+          <div class="spark spark-2"></div>
+          <div class="spark spark-3"></div>
+          <div class="spark spark-4"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal nhập tài khoản + mã quay (khi chưa đăng nhập) -->
+    <div id="spin-info-modal" class="modal-backdrop" aria-hidden="true">
+      <div class="modal spin-modal">
+        <!-- <button class="modal-close" id="spin-modal-close" aria-label="Đóng">×</button> -->
+        <div class="modal-inner-glow"></div>
+        <div class="modal-content">
+          <p class="modal-label">Bắt đầu quay thưởng</p>
+
+          <div id="spin-username-row">
+            <h3 style="margin: 20px 0 8px;">Nhập tên tài khoản 188lux</h3>
+            <input id="spin-username-input" type="text" placeholder="Ví dụ: gia123" autocomplete="off" />
+          </div>
+
+          <h3 style="margin: 24px 0 8px;">Nhập mã quay</h3>
+          <input id="spin-code-input" type="text" placeholder="Nhập mã code của bạn" autocomplete="off" />
+
+          <button id="spin-confirm-btn" class="spin-button small" type="button" style="margin-top: 24px; width: 100%;">
+            Xác nhận & Quay
+          </button>
+
+          <p id="spin-error" class="result error" style="margin-top: 16px; min-height: 24px;"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
