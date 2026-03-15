@@ -88,7 +88,7 @@ app.post("/api/get-or-create-user", async (req, res) => {
       return res.status(400).json({
         success: false,
         message:
-          "Tài khoản chưa đăng ký. Vào trang /taoma (mật khẩu admin: 141920) để thêm tài khoản trước khi quay.",
+          "Tài khoản chưa đăng ký.",
       });
     }
 
@@ -201,7 +201,7 @@ app.post("/api/claim-card", async (req, res) => {
       await Card.updateOne(
         { _id: card._id },
         { $set: { used: false, usedAt: null } }
-      ).catch(() => {});
+      ).catch(() => { });
       return res.status(400).json({
         message:
           "Không tìm thấy lượt quay hợp lệ để nhận thưởng. Vui lòng quay lại hoặc liên hệ hỗ trợ.",
@@ -409,7 +409,7 @@ app.get("/taoma", (req, res) => {
         </style>
       </head>
       <body>
-        <h1>🔑 Trang Quản Trị - Mật khẩu: 141920</h1>
+        <h1>🔑 Trang Quản Trị</h1>
         <p><a href="/taoma?logout=1">Đăng xuất</a></p>
         <hr>
 
