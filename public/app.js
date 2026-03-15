@@ -352,7 +352,7 @@ async function checkUsername(username) {
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new Error(data.message || "Lỗi server khi kiểm tra tài khoản");
+    throw new Error(data.message || data.error || "Lỗi server khi kiểm tra tài khoản");
   }
 
   if (!data.success) {
@@ -368,12 +368,10 @@ async function verifyAndSpin(code, username) {
     body: JSON.stringify({ code, username })
   });
 
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.message || "Lỗi server khi xác thực mã");
+    throw new Error(data.message || data.error || "Lỗi server khi xác thực mã");
   }
-
-  const data = await res.json();
   if (!data.ok) {
     throw new Error(data.message || "Mã không hợp lệ hoặc đã sử dụng");
   }

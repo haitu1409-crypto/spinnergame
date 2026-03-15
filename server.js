@@ -82,13 +82,15 @@ app.post("/api/get-or-create-user", async (req, res) => {
 
     const user = await User.findOne({ username });
     if (!user) {
+      console.log("get-or-create-user: tài khoản chưa có trong DB:", username);
       return res.status(400).json({
         success: false,
         message:
-          "Tài khoản chưa đăng ký. Chỉ tài khoản đã được admin thêm trong trang taoma mới có thể quay số. Vui lòng liên hệ để được thêm vào danh sách.",
+          "Tài khoản chưa đăng ký. Vào trang /taoma (mật khẩu admin: 141920) để thêm tài khoản trước khi quay.",
       });
     }
 
+    console.log("get-or-create-user: OK", username);
     res.json({ success: true, username: user.username });
   } catch (err) {
     console.error("Lỗi /api/get-or-create-user:", err);
