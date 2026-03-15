@@ -2,20 +2,28 @@
 const mongoose = require('mongoose');
 require('dotenv').config();
 
+/**
+ * Kết nối MongoDB. Trả về { connected, error } để API có thể hiển thị lỗi thật.
+ * Trên Vercel: cấu hình MONGODB_URI trong Environment Variables.
+ * Nếu lỗi "connection timed out" / "ECONNREFUSED": vào MongoDB Atlas → Network Access → thêm 0.0.0.0/0 (cho phép mọi IP).
+ */
 const connectDB = async () => {
-    const uri = process.env.MONGODB_URI || "mongodb+srv://laongogia76_db_user:PwS6Bw7n8B1TEZ2X@cluster0.9ugi4ot.mongodb.net/spin_game?retryWrites=true&w=majority";
+    const uri = process.env.MONGODB_URI;
     if (!uri || typeof uri !== 'string') {
-        console.error('Lỗi kết nối MongoDB: MONGODB_URI chưa được cấu hình. Trên Vercel: Project → Settings → Environment Variables → thêm MONGODB_URI.');
-        return;
+        const msg = 'MONGODB_URI chưa được cấu hình (Vercel: Settings → Environment Variables).';
+        console.error('Lỗi kết nối MongoDB:', msg);
+        return { connected: false, error: msg };
     }
     try {
         await mongoose.connect(uri);
         console.log('MongoDB Atlas kết nối thành công!');
+        return { connected: true };
     } catch (error) {
         console.error('Lỗi kết nối MongoDB:', error.message);
         if (!process.env.VERCEL) {
             process.exit(1);
         }
+        return { connected: false, error: error.message };
     }
 };
 
