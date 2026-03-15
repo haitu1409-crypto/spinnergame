@@ -32,10 +32,14 @@ app.use(
   })
 );
 
-// Serve static frontend files (index.html, app.js, style.css, imgs, ...)
-// Trên Vercel dùng process.cwd() để tìm file (__dirname có thể chỉ trỏ vào bundle)
-const staticDirs = [process.cwd(), __dirname].filter(Boolean);
-staticDirs.forEach((dir) => app.use(express.static(path.join(dir))));
+// Thư mục static (cấu trúc public/ giống dự án tham khảo front_end_dande)
+const publicDirs = [
+  path.join(__dirname, "public"),
+  path.join(process.cwd(), "public"),
+  process.cwd(),
+];
+const publicDir = publicDirs.find((d) => fs.existsSync(path.join(d, "index.html"))) || path.join(__dirname, "public");
+app.use(express.static(publicDir));
 
 // Trên Vercel: trả 503 nếu chưa cấu hình MONGODB_URI (tránh crash)
 app.use("/api", (req, res, next) => {
@@ -353,12 +357,11 @@ app.post("/api/history", async (req, res) => {
   }
 });
 
-// Trang chính vòng quay (thử cwd trước để tương thích Vercel)
+// Trang chính vòng quay
 app.get("/", (req, res) => {
-  const idxCwd = path.join(process.cwd(), "index.html");
-  const idxDir = path.join(__dirname, "index.html");
-  if (fs.existsSync(idxCwd)) return res.sendFile(idxCwd);
-  res.sendFile(idxDir);
+  const idx = path.join(publicDir, "index.html");
+  if (fs.existsSync(idx)) return res.sendFile(idx);
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 // ======================== TRANG ADMIN /taoma (tạo mã, thẻ cào, user) ========================

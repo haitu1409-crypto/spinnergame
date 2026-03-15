@@ -3,15 +3,20 @@
   "builds": [
     { "src": "server.js", "use": "@vercel/node" }
   ],
-  "functions": {
-    "server.js": {
-      "includeFiles": "index.html"
-    }
-  },
   "rewrites": [
     { "source": "/api/:path*", "destination": "/server.js" },
     { "source": "/taoma", "destination": "/server.js" },
     { "source": "/admin-login", "destination": "/server.js" },
     { "source": "/(.*)", "destination": "/server.js" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    }
   ]
 }
