@@ -1170,7 +1170,7 @@ body {
 /* Responsive */
 @media (max-width: 768px) {
   .app {
-    padding: 16px 12px 32px;
+    padding: 12px 8px 24px;
   }
 
   .header {
@@ -1186,6 +1186,7 @@ body {
   .page-layout {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto;
+    gap: 12px;
   }
 
   .history-sidebar {
@@ -1209,18 +1210,22 @@ body {
     word-break: break-all;
   }
 
+  .grid-section {
+    padding: 10px;
+  }
+
   .grid {
-    gap: 6px;
+    gap: 4px;
   }
 
   .prize-cell {
-    padding: 3px;
-    border-radius: 9px;
+    padding: 2px;
+    border-radius: 8px;
   }
 
   .prize-icon {
-    width: 90%;
-    max-width: 72px;
+    width: 92%;
+    max-width: 88px;
   }
 
   .spin-button {
@@ -1271,12 +1276,25 @@ body {
 }
 
 @media (max-width: 480px) {
+  .app {
+    padding: 10px 6px 20px;
+  }
+
+  .grid-section {
+    padding: 6px;
+  }
+
   .grid {
-    gap: 4px;
+    gap: 3px;
+  }
+
+  .prize-cell {
+    padding: 1px;
+    border-radius: 6px;
   }
 
   .prize-icon {
-    max-width: 64px;
+    max-width: 80px;
   }
 
   .spin-button-circle {

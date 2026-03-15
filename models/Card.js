@@ -8,5 +8,6 @@ const cardSchema = new mongoose.Schema({
     usedAt: Date,
     createdAt: { type: Date, default: Date.now }
 });
+cardSchema.index({ prizeLabel: 1, used: 1 });
 
 module.exports = mongoose.model('Card', cardSchema);

@@ -120,50 +120,34 @@ app.post("/api/verify-code", async (req, res) => {
     username = username.trim().toLowerCase();
     code = code.trim().toUpperCase();
 
-    // Đảm bảo user tồn tại
-    const user = await User.findOne({ username }).lean();
+    const now = new Date();
+    const [user, updated] = await Promise.all([
+      User.findOne({ username }).lean(),
+      SpinCode.findOneAndUpdate(
+        { code, used: false },
+        { $set: { used: true, usedAt: now } },
+        { new: true }
+      ).lean(),
+    ]);
+
     if (!user) {
       return res
         .status(400)
         .json({ ok: false, message: "Tài khoản không hợp lệ hoặc chưa đăng ký" });
     }
-
-    // Kiểm tra mã quay
-    const spinCodeDoc = await SpinCode.findOne({ code });
-    if (!spinCodeDoc) {
+    if (!updated) {
+      const exists = await SpinCode.findOne({ code }).select("used").lean();
       return res
         .status(400)
-        .json({ ok: false, message: "Mã không hợp lệ" });
+        .json({ ok: false, message: exists?.used ? "Mã đã được sử dụng" : "Mã không hợp lệ" });
     }
 
-    if (spinCodeDoc.used) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "Mã đã được sử dụng" });
-    }
-
-    // Đánh dấu mã đã dùng
-    spinCodeDoc.used = true;
-    spinCodeDoc.usedAt = new Date();
-    await spinCodeDoc.save();
-
-    // Lưu vào bảng UsedCode (nếu muốn theo dõi thêm)
-    try {
-      await UsedCode.create({
-        code,
-        ip: req.ip,
-      });
-    } catch (e) {
-      // Không quan trọng, chỉ log
-      console.warn("Không thể ghi UsedCode, bỏ qua:", e.message);
-    }
-
-    // Ghi lịch sử lượt quay (chưa claim, chưa biết trúng gì)
-    await SpinHistory.create({
-      username,
-      spinCode: code,
-      isClaimed: false,
-    });
+    await Promise.all([
+      UsedCode.create({ code, ip: req.ip }).catch((e) => {
+        if (e) console.warn("UsedCode:", e.message);
+      }),
+      SpinHistory.create({ username, spinCode: code, isClaimed: false }),
+    ]);
 
     res.json({ ok: true });
   } catch (err) {
@@ -194,57 +178,60 @@ app.post("/api/claim-card", async (req, res) => {
     username = username.trim().toLowerCase();
     prizeLabel = prizeLabel.trim();
 
-    // Lấy 1 thẻ cào còn trống tương ứng với prizeLabel
-    const card = await Card.findOne({ prizeLabel, used: false });
+    const now = new Date();
+    const [card, history] = await Promise.all([
+      Card.findOneAndUpdate(
+        { prizeLabel, used: false },
+        { $set: { used: true, usedAt: now } },
+        { new: true }
+      ).lean(),
+      SpinHistory.findOne({
+        username,
+        isClaimed: false,
+        $nor: [{ prizeLabel: { $regex: /^Thêm lượt quay/ } }],
+      }).sort({ spunAt: -1 }).lean(),
+    ]);
+
     if (!card) {
       return res.status(400).json({
         message: "Hiện tại đã hết thẻ cào cho giải thưởng này, vui lòng liên hệ hỗ trợ",
       });
     }
-
-    const now = new Date();
-
-    // Đánh dấu thẻ này đã dùng
-    card.used = true;
-    card.usedAt = now;
-    await card.save();
-
-    // Tìm bản ghi SpinHistory mới nhất CHƯA claim (không phải bản ghi bonus) để gắn thẻ
-    const history = await SpinHistory.findOne({
-      username,
-      isClaimed: false,
-      $nor: [{ prizeLabel: { $regex: /^Thêm lượt quay/ } }],
-    }).sort({ spunAt: -1 });
-
-    // Nếu KHÔNG có lịch sử tương ứng, không cho claim để tránh spam / hack
     if (!history) {
+      await Card.updateOne(
+        { _id: card._id },
+        { $set: { used: false, usedAt: null } }
+      ).catch(() => {});
       return res.status(400).json({
         message:
           "Không tìm thấy lượt quay hợp lệ để nhận thưởng. Vui lòng quay lại hoặc liên hệ hỗ trợ.",
       });
     }
 
-    history.prizeLabel = prizeLabel;
-    history.isClaimed = true;
-    history.cardCode = card.code;
-    history.serial = card.serial;
-    history.claimedAt = now;
-    await history.save();
-
-    // Lưu vào bảng ClaimedCard (log chi tiết)
-    try {
-      await ClaimedCard.create({
+    await Promise.all([
+      SpinHistory.updateOne(
+        { _id: history._id },
+        {
+          $set: {
+            prizeLabel,
+            isClaimed: true,
+            cardCode: card.code,
+            serial: card.serial,
+            claimedAt: now,
+          },
+        }
+      ),
+      ClaimedCard.create({
         prizeLabel,
         code: card.code,
         serial: card.serial,
         claimedByCode: history.spinCode,
         ip: req.ip,
-      });
-    } catch (e) {
-      console.warn("Không thể ghi ClaimedCard, bỏ qua:", e.message);
-    }
+      }).catch((e) => {
+        if (e) console.warn("ClaimedCard:", e.message);
+      }),
+    ]);
 
-    // Trả về mã thẻ cho frontend hiển thị
     res.json({
       code: card.code,
       serial: card.serial,
@@ -283,35 +270,47 @@ app.post("/api/record-bonus-win", async (req, res) => {
     }
 
     const bonusCodes = [];
+    const seen = new Set();
     for (let i = 0; i < count; i++) {
-      let newCode = null;
       for (let r = 0; r < 50; r++) {
         const randomPart = Math.floor(100000 + Math.random() * 900000);
         const c = `CODE${randomPart}`;
-        const exists = await SpinCode.findOne({ code: c });
-        if (!exists) {
-          newCode = c;
-          break;
-        }
+        if (seen.has(c)) continue;
+        seen.add(c);
+        bonusCodes.push(c);
+        break;
       }
-      if (!newCode) continue;
+    }
+
+    let insertedCodes = [];
+    if (bonusCodes.length > 0) {
+      const toInsert = bonusCodes.map((code) => ({ code, used: false }));
       try {
-        await SpinCode.create({ code: newCode, used: false });
-        bonusCodes.push(newCode);
+        const result = await SpinCode.insertMany(toInsert, { ordered: false });
+        insertedCodes = bonusCodes;
       } catch (e) {
-        i--;
+        if (e.result?.insertedIds && typeof e.result.insertedIds === "object") {
+          insertedCodes = Object.keys(e.result.insertedIds)
+            .sort((a, b) => Number(a) - Number(b))
+            .map((idx) => toInsert[Number(idx)].code);
+        }
+        if (e.writeErrors) {
+          for (const w of e.writeErrors) {
+            if (w.code !== 11000) throw e;
+          }
+        } else throw e;
       }
     }
 
     await SpinHistory.create({
       username,
-      spinCode: bonusCodes[0] || "BONUS",
+      spinCode: insertedCodes[0] || "BONUS",
       prizeLabel,
       isClaimed: false,
-      bonusCodes,
+      bonusCodes: insertedCodes,
     });
 
-    res.json({ success: true, bonusCodes });
+    res.json({ success: true, bonusCodes: insertedCodes });
   } catch (err) {
     console.error("Lỗi /api/record-bonus-win:", err);
     res.status(500).json({ success: false, message: "Lỗi ghi nhận bonus" });
@@ -335,22 +334,35 @@ app.post("/api/history", async (req, res) => {
       .sort({ spunAt: -1 })
       .lean();
 
-    // Gắn trạng thái đã dùng cho từng bonus code
-    const historyWithUsed = await Promise.all(
-      history.map(async (h) => {
-        const item = { ...h };
-        if (item.bonusCodes?.length) {
-          item.bonusCodesWithStatus = await Promise.all(
-            item.bonusCodes.map(async (rawCode) => {
-              const codeNorm = String(rawCode || "").trim().toUpperCase();
-              const doc = await SpinCode.findOne({ code: codeNorm }).select("used").lean();
-              return { code: codeNorm || rawCode, used: Boolean(doc?.used) };
-            })
-          );
+    const allCodes = [];
+    for (const h of history) {
+      if (h.bonusCodes?.length) {
+        for (const raw of h.bonusCodes) {
+          const c = String(raw || "").trim().toUpperCase();
+          if (c) allCodes.push(c);
         }
-        return item;
-      })
-    );
+      }
+    }
+    const usedSet = new Set();
+    if (allCodes.length > 0) {
+      const usedDocs = await SpinCode.find({ code: { $in: allCodes } })
+        .select("code used")
+        .lean();
+      for (const d of usedDocs) {
+        if (d.used) usedSet.add(String(d.code).toUpperCase());
+      }
+    }
+
+    const historyWithUsed = history.map((h) => {
+      const item = { ...h };
+      if (item.bonusCodes?.length) {
+        item.bonusCodesWithStatus = item.bonusCodes.map((rawCode) => {
+          const codeNorm = String(rawCode || "").trim().toUpperCase();
+          return { code: codeNorm || rawCode, used: usedSet.has(codeNorm) };
+        });
+      }
+      return item;
+    });
 
     res.json({
       success: true,

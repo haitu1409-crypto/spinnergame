@@ -408,20 +408,19 @@ async function verifyAndSpin(code, username) {
   }
 }
 
-async function recordBonusWin(username, prizeLabel) {
-  try {
-    const res = await fetch("/api/record-bonus-win", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, prizeLabel })
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.bonusCodes?.length) loadHistory(username);
-    }
-  } catch (e) {
-    console.warn("Không ghi được bonus:", e);
-  }
+function recordBonusWin(username, prizeLabel) {
+  fetch("/api/record-bonus-win", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, prizeLabel })
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.bonusCodes?.length && currentUsername === username) {
+        loadHistory(username);
+      }
+    })
+    .catch((e) => console.warn("Không ghi được bonus:", e));
 }
 
 // === QUAY & XỬ LÝ BONUS ===
@@ -473,27 +472,26 @@ async function handleSpin() {
 }
 
 async function claimPrize(label, username) {
-  try {
-    els.claimMessage.textContent = "Đang lấy mã thẻ...";
-    els.claimInfo.classList.remove("hidden");
+  els.claimMessage.textContent = "Đang lấy mã thẻ...";
+  els.claimInfo.classList.remove("hidden");
 
+  try {
     const res = await fetch("/api/claim-card", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prizeLabel: label, username })
     });
 
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.message || "Không thể nhận thưởng");
+      throw new Error(data.message || "Không thể nhận thưởng");
     }
 
-    const data = await res.json();
-    els.claimCode.textContent = data.code;
-    els.claimSerial.textContent = data.serial;
+    els.claimCode.textContent = data.code || "";
+    els.claimSerial.textContent = data.serial || "";
     els.claimMessage.textContent = "Đã nhận thưởng. Hãy lưu lại mã thẻ này!";
 
-    if (currentUsername) await loadHistory(currentUsername);
+    if (currentUsername) loadHistory(currentUsername);
     return true;
   } catch (err) {
     els.claimMessage.textContent = err.message;
@@ -609,14 +607,14 @@ els.spinConfirmBtn?.addEventListener("click", async () => {
     return;
   }
 
-  els.spinError.textContent = "Đang kiểm tra...";
+  els.spinError.textContent = "Đang xác thực...";
   els.spinConfirmBtn.disabled = true;
 
   try {
-    let u = currentUsername || (await checkUsername(username));
+    const u = currentUsername || (await checkUsername(username));
     currentUsername = u;
     setLoggedIn(u);
-
+    els.spinError.textContent = "Đang xác thực mã quay...";
     await verifyAndSpin(code, u);
 
     els.spinModal.classList.remove("visible");

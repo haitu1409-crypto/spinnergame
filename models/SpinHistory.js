@@ -11,5 +11,6 @@ const spinHistorySchema = new mongoose.Schema({
     spunAt: { type: Date, default: Date.now },
     claimedAt: Date
 });
+spinHistorySchema.index({ username: 1, isClaimed: 1, spunAt: -1 });
 
 module.exports = mongoose.model('SpinHistory', spinHistorySchema);
