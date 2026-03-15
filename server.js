@@ -41,13 +41,16 @@ const publicDirs = [
 const publicDir = publicDirs.find((d) => fs.existsSync(path.join(d, "index.html"))) || path.join(__dirname, "public");
 app.use(express.static(publicDir));
 
-// Trên Vercel: trả 503 nếu chưa cấu hình MONGODB_URI (tránh crash)
-app.use("/api", (req, res, next) => {
+// Trên Vercel: đợi kết nối DB trước khi trả 503 (env có hiệu lực khi request chạy)
+app.use("/api", async (req, res, next) => {
   if (req.path === "/health") return next();
+  if (mongoose.connection.readyState === 1) return next();
+  // Thử kết nối (dùng MONGODB_URI lúc runtime; trên Vercel cần redeploy sau khi thêm env)
+  await connectDB();
   if (mongoose.connection.readyState !== 1) {
     return res.status(503).json({
       success: false,
-      message: "Database chưa cấu hình. Vercel → Project Settings → Environment Variables → thêm MONGODB_URI.",
+      message: "Database chưa cấu hình. Thêm MONGODB_URI trong Environment Variables rồi Redeploy lại.",
     });
   }
   next();
